@@ -13,7 +13,14 @@ dcm-fleet-deployment/
 
 ## Quick Start
 
-1. Clone this repository to the target device:
+1. Install GitHub CLI and authenticate:
+   ```bash
+   sudo apt update
+   sudo apt install gh
+   gh auth login
+   ```
+
+2. Clone this repository to the target device:
    ```bash
    sudo mkdir -p /opt/commander/fleet/deployment
    sudo chown developer:developer /opt/commander/fleet
@@ -21,7 +28,7 @@ dcm-fleet-deployment/
    gh repo clone Ayanda43/dcm-fleet-deployment deployment
    ```
 
-2. Run the deployment:
+3. Run the deployment:
    ```bash
    cd /opt/commander/fleet/deployment
    sudo ./deploy-dcm-fleet.sh
