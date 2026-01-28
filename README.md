@@ -15,15 +15,15 @@ dcm-fleet-deployment/
 
 1. Clone this repository to the target device:
    ```bash
-   sudo mkdir -p /opt/fleet/deployment
-   sudo chown developer:developer /opt/fleet
-   cd /opt/fleet
+   sudo mkdir -p /opt/commander/fleet/deployment
+   sudo chown developer:developer /opt/commander/fleet
+   cd /opt/commander/fleet
    gh repo clone Ayanda43/dcm-fleet-deployment deployment
    ```
 
 2. Run the deployment:
    ```bash
-   cd /opt/fleet/deployment
+   cd /opt/commander/fleet/deployment
    sudo ./deploy-dcm-fleet.sh
    ```
 
@@ -34,7 +34,7 @@ The deployment script runs through the following phases:
 1. **RevPi Setup** - Configures Revolution Pi hardware, kernel modules (requires reboot)
 2. **Prerequisites** - Installs git, curl, GitHub CLI
 3. **ROS2 Kilted** - Installs ROS2 Kilted with Zenoh middleware
-4. **Clone Repository** - Clones `Ayanda43/tsam-dcm` to `/opt/fleet/dcm-control`
+4. **Clone Repository** - Clones `Ayanda43/tsam-dcm` to `/opt/commander/fleet/dcm-control`
 5. **Node.js 20.x** - Installs Node.js LTS
 6. **Build App** - Runs `npm install && npm run build`
 7. **Zenoh Setup** - Runs `scripts/dcm_zenoh_setup.sh` (creates services)
@@ -44,11 +44,11 @@ The deployment script runs through the following phases:
 
 | Component | Path |
 |-----------|------|
-| Fleet Base | `/opt/fleet/` |
-| DCM Control | `/opt/fleet/dcm-control/` |
-| Deployment | `/opt/fleet/deployment/` |
-| Config | `/etc/fleet/` |
-| State | `/var/lib/fleet/` |
+| Fleet Base | `/opt/commander/fleet/` |
+| DCM Control | `/opt/commander/fleet/dcm-control/` |
+| Deployment | `/opt/commander/fleet/deployment/` |
+| Config | `/etc/commander/fleet/` |
+| State | `/var/lib/commander/fleet/` |
 | Logs | `/var/log/fleet-deployment.log` |
 
 ## Services Created
@@ -87,7 +87,7 @@ The kiosk starts automatically after reboot.
 
 ### Check deployment state
 ```bash
-cat /var/lib/fleet/deployment_state
+cat /var/lib/commander/fleet/deployment_state
 ```
 
 ### Resume deployment after failure
@@ -102,7 +102,7 @@ cat /var/log/fleet-deployment.log
 
 ### Reset deployment state
 ```bash
-sudo rm /var/lib/fleet/deployment_state
+sudo rm /var/lib/commander/fleet/deployment_state
 sudo ./deploy-dcm-fleet.sh
 ```
 

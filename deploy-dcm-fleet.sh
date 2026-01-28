@@ -6,7 +6,7 @@
 # with automatic reboot handling and state persistence.
 #
 # Installation:
-#   Clone this repo to: /opt/fleet/deployment/
+#   Clone this repo to: /opt/commander/fleet/deployment/
 #
 # Usage:
 #   sudo ./deploy-dcm-fleet.sh           # Interactive deployment
@@ -36,11 +36,11 @@ NC='\033[0m' # No Color
 
 # Configuration
 ROS_DISTRO="kilted"
-FLEET_DIR="/opt/fleet"
-DCM_DIR="/opt/fleet/dcm-control"
-DEPLOYMENT_DIR="/opt/fleet/deployment"
-CONFIG_DIR="/etc/fleet"
-STATE_FILE="/var/lib/fleet/deployment_state"
+FLEET_DIR="/opt/commander/fleet"
+DCM_DIR="/opt/commander/fleet/dcm-control"
+DEPLOYMENT_DIR="/opt/commander/fleet/deployment"
+CONFIG_DIR="/etc/commander/fleet"
+STATE_FILE="/var/lib/commander/fleet/deployment_state"
 LOG_FILE="/var/log/fleet-deployment.log"
 
 # Deployment phases
