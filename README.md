@@ -279,7 +279,7 @@ sudo apt install gh
 gh auth login
 sudo mkdir -p /opt/commander/fleet
 cd /opt/commander/fleet
-git clone https://github.com/Ayanda43/dcm-fleet-deployment.git deployment
+sudo git clone https://github.com/Ayanda43/dcm-fleet-deployment.git /opt/commander/fleet/deployment
 cd deployment
 ```
 
