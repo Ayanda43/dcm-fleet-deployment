@@ -76,9 +76,9 @@ log_info() {
 }
 
 log_phase() {
-    echo -e "${CYAN}╔════════════════════════════════════════════════════════════╗${NC}" >&2
+    echo -e "${CYAN}╔═══════════════════════════════════════════════════════════[...]"
     echo -e "${CYAN}║${NC} $1" >&2
-    echo -e "${CYAN}╚════════════════════════════════════════════════════════════╝${NC}" >&2
+    echo -e "${CYAN}╚═══════════════════════════════════════════════════════════[...]"
     log "$1"
 }
 
@@ -540,7 +540,7 @@ setxkbmap -option terminate:ctrl_alt_bksp
 
 # Fix chromium crash recovery prompts
 sed -i 's/"exited_cleanly":false/"exited_cleanly":true/' ~/.config/chromium/'Local State' 2>/dev/null || true
-sed -i 's/"exited_cleanly":false/"exited_cleanly":true/; s/"exit_type":"[^"]\+"/"exit_type":"Normal"/' ~/.config/chromium/Default/Preferences 2>/dev/null || true
+sed -i 's/"exited_cleanly":false/"exited_cleanly":true/; s/"exit_type":"[^"]"/"exit_type":"Normal"/' ~/.config/chromium/Default/Preferences 2>/dev/null || true
 
 # Start Chromium in kiosk mode pointing to DCM Control
 chromium --disable-infobars --kiosk --ozone-platform=x11 --use-gl=desktop --disable-gpu-compositing 'http://localhost:8090'
@@ -563,7 +563,7 @@ setxkbmap -option terminate:ctrl_alt_bksp
 
 # Fix chromium crash recovery prompts
 sed -i 's/"exited_cleanly":false/"exited_cleanly":true/' ~/.config/chromium/'Local State' 2>/dev/null || true
-sed -i 's/"exited_cleanly":false/"exited_cleanly":true/; s/"exit_type":"[^"]\+"/"exit_type":"Normal"/' ~/.config/chromium/Default/Preferences 2>/dev/null || true
+sed -i 's/"exited_cleanly":false/"exited_cleanly":true/; s/"exit_type":"[^"]"/"exit_type":"Normal"/' ~/.config/chromium/Default/Preferences 2>/dev/null || true
 
 # Start Chromium in kiosk mode pointing to DCM Control
 chromium --disable-infobars --kiosk --ozone-platform=x11 --use-gl=desktop --disable-gpu-compositing 'http://localhost:8090'
@@ -615,8 +615,8 @@ EOF
     mkdir -p /etc/systemd/system/lightdm.service.d
     cat > /etc/systemd/system/lightdm.service.d/wait-for-app.conf << 'EOF'
 [Unit]
-After=app.service
-Wants=app.service
+After=cmdr-fleet-ui.service
+Wants=cmdr-fleet-ui.service
 EOF
     chmod 644 /etc/systemd/system/lightdm.service.d/wait-for-app.conf
     systemctl daemon-reload
@@ -644,9 +644,9 @@ phase_complete() {
     clear_state
 
     echo ""
-    echo -e "${GREEN}═══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${GREEN}═══════════════════════════════════════════════════════════��[...]"
     echo -e "${GREEN}  DCM Fleet System - Deployment Complete${NC}"
-    echo -e "${GREEN}═══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${GREEN}═══════════════════════════════════════════════════════════��[...]"
     echo ""
     echo -e "  ${CYAN}Installation Details:${NC}"
     echo -e "    DCM Directory: $DCM_DIR"
@@ -656,18 +656,18 @@ phase_complete() {
     echo -e "  ${CYAN}Systemd Services:${NC}"
     echo -e "    zenoh-router.service:       $(systemctl is-enabled zenoh-router.service 2>/dev/null || echo 'disabled')"
     echo -e "    rosbridge-websocket.service: $(systemctl is-enabled rosbridge-websocket.service 2>/dev/null || echo 'disabled')"
-    echo -e "    app.service:                $(systemctl is-enabled app.service 2>/dev/null || echo 'disabled')"
+    echo -e "    cmdr-fleet-ui.service:      $(systemctl is-enabled cmdr-fleet-ui.service 2>/dev/null || echo 'disabled')"
     echo ""
     echo -e "  ${CYAN}Verification Commands:${NC}"
-    echo -e "    systemctl status zenoh-router rosbridge-websocket app"
+    echo -e "    systemctl status zenoh-router rosbridge-websocket cmdr-fleet-ui"
     echo -e "    curl http://localhost:8090"
     echo ""
     echo -e "  ${CYAN}Next Steps:${NC}"
     echo -e "    1. Reboot to test auto-start: sudo reboot"
-    echo -e "    2. View logs: journalctl -u app.service -f"
+    echo -e "    2. View logs: journalctl -u cmdr-fleet-ui -f"
     echo -e "    3. Check kiosk: systemctl status lightdm"
     echo ""
-    echo -e "${GREEN}═══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${GREEN}═══════════════════════════════════════════════════════════��[...]"
     echo ""
 }
 
@@ -691,10 +691,10 @@ main() {
 
     # Show banner
     echo ""
-    echo -e "${CYAN}╔════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}╔═══════════════════════════════════════════════════════════[...]"
     echo -e "${CYAN}║${NC}  DCM Fleet - Complete Deployment System                    ${CYAN}║${NC}"
     echo -e "${CYAN}║${NC}  Distributed Control Manager                               ${CYAN}║${NC}"
-    echo -e "${CYAN}╚════════════════════════════════════════════════════════════╝${NC}"
+    echo -e "${CYAN}╚═══════════════════════════════════════════════════════════[...]"
     echo ""
 
     # Get current phase
