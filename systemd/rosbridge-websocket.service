@@ -1,0 +1,15 @@
+[Unit]
+Description=ROS2 Rosbridge WebSocket Server
+After=zenoh-router.service
+Wants=zenoh-router.service
+
+[Service]
+Type=simple
+User=developer
+EnvironmentFile=/etc/commander/fleet/fleet.env
+ExecStart=/bin/bash -c 'source /opt/ros/kilted/setup.bash && ros2 launch rosbridge_server rosbridge_websocket_launch.xml'
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

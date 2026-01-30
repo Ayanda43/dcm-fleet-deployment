@@ -1,0 +1,13 @@
+[Unit]
+Description=Zenoh DDS Router for Fleet Communication
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/opt/commander/zenoh/zenohd
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

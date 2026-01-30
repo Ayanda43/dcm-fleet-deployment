@@ -9,15 +9,25 @@
 #   Clone this repo to: /opt/commander/fleet/deployment/
 #
 # Usage:
-#   sudo ./deploy-dcm-fleet.sh           # Interactive deployment
-#   sudo ./deploy-dcm-fleet.sh --auto    # Automated deployment
+#   sudo ./deploy-dcm-fleet.sh                    # Interactive deployment
+#   sudo ./deploy-dcm-fleet.sh --auto             # Automated deployment (no prompts)
+#   sudo ./deploy-dcm-fleet.sh --continue         # Continue from last phase
+#   sudo ./deploy-dcm-fleet.sh --dcm=corolla      # Use Corolla DCM repository
+#   sudo ./deploy-dcm-fleet.sh --repo-url=<url>   # Use custom repository URL
+#
+# Repository Options:
+#   --dcm=tsam     Use Ayanda43/tsam-dcm (default)
+#   --dcm=corolla  Use Ayanda43/corrolla-dcm
+#   --repo-url=https://github.com/user/repo.git  Clone via git
+#   --repo-url=user/repo                         Clone via gh CLI
 #
 # Features:
 # - Automatic reboot handling with state persistence
 # - GitHub authentication (gh CLI + SSH fallback)
 # - Complete ROS2 Kilted installation
 # - Node.js app build and configuration
-# - Systemd service installation
+# - Systemd service installation (from systemd/ folder)
+# - Environment configuration (from fleet.env.example)
 # - Kiosk mode setup
 #
 # Author: Based on BATTALION Technologies deployment scripts
@@ -325,8 +335,45 @@ phase_clone_repo() {
     mkdir -p "$FLEET_DIR"
     chown -R developer:developer "$FLEET_DIR"
 
-    # Clone tsam-dcm repository
-    log_info "Cloning Ayanda43/tsam-dcm repository..."
+    # Determine which repository to clone
+    CLONE_REPO=""
+    CLONE_METHOD=""
+
+    if [ -n "$REPO_URL" ]; then
+        # Custom repository URL provided
+        if [[ "$REPO_URL" =~ ^https?:// ]]; then
+            # Full URL - use git clone
+            CLONE_REPO="$REPO_URL"
+            CLONE_METHOD="git"
+            log_info "Using custom repository URL: $REPO_URL"
+        else
+            # Short form (owner/repo) - use gh repo clone
+            CLONE_REPO="$REPO_URL"
+            CLONE_METHOD="gh"
+            log_info "Using custom repository: $REPO_URL"
+        fi
+    elif [ -n "$DCM_REPO" ]; then
+        # Predefined DCM repository
+        case "$DCM_REPO" in
+            corolla)
+                CLONE_REPO="Ayanda43/corrolla-dcm"
+                CLONE_METHOD="gh"
+                log_info "Using Corolla DCM repository"
+                ;;
+            tsam|*)
+                CLONE_REPO="Ayanda43/tsam-dcm"
+                CLONE_METHOD="gh"
+                log_info "Using TSAM DCM repository (default)"
+                ;;
+        esac
+    else
+        # Default repository
+        CLONE_REPO="Ayanda43/tsam-dcm"
+        CLONE_METHOD="gh"
+        log_info "Using default TSAM DCM repository"
+    fi
+
+    # Clone or update repository
     if [ -d "$DCM_DIR" ]; then
         log_info "Repository already exists, pulling latest..."
         sudo -u developer bash -c "
@@ -334,10 +381,18 @@ phase_clone_repo() {
             git pull
         "
     else
-        sudo -u developer bash -c "
-            cd $FLEET_DIR
-            gh repo clone Ayanda43/tsam-dcm dcm-control
-        "
+        log_info "Cloning $CLONE_REPO..."
+        if [ "$CLONE_METHOD" = "git" ]; then
+            sudo -u developer bash -c "
+                cd $FLEET_DIR
+                git clone $CLONE_REPO dcm-control
+            "
+        else
+            sudo -u developer bash -c "
+                cd $FLEET_DIR
+                gh repo clone $CLONE_REPO dcm-control
+            "
+        fi
     fi
 
     log "✓ Repository cloned to $DCM_DIR"
@@ -448,6 +503,9 @@ phase_build_app() {
 phase_setup_zenoh() {
     log_phase "PHASE 7: Zenoh Router & Services Setup"
 
+    # Get script directory for accessing bundled files
+    SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
     # Run the existing dcm_zenoh_setup.sh script from the cloned repo
     log_info "Running dcm_zenoh_setup.sh..."
 
@@ -459,13 +517,46 @@ phase_setup_zenoh() {
         "
         log "✓ Zenoh setup complete"
     else
-        log_error "dcm_zenoh_setup.sh not found at $DCM_DIR/scripts/dcm_zenoh_setup.sh"
-        exit 1
+        log_warn "dcm_zenoh_setup.sh not found at $DCM_DIR/scripts/dcm_zenoh_setup.sh"
+        log_info "Installing services from deployment repository..."
     fi
+
+    # Install systemd service files from deployment repository
+    if [ -d "$SCRIPT_DIR/systemd" ]; then
+        log_info "Installing systemd service files from deployment repository..."
+        for service_file in "$SCRIPT_DIR/systemd"/*.service; do
+            if [ -f "$service_file" ]; then
+                service_name=$(basename "$service_file")
+                log_info "  Installing: $service_name"
+                cp "$service_file" /etc/systemd/system/
+                chmod 644 "/etc/systemd/system/$service_name"
+            fi
+        done
+        systemctl daemon-reload
+        log "✓ Systemd service files installed"
+    fi
+
+    # Enable services
+    log_info "Enabling systemd services..."
+    systemctl enable zenoh-router.service || true
+    systemctl enable rosbridge-websocket.service || true
+    systemctl enable cmdr-fleet-ui.service || true
+    log "✓ Services enabled"
 
     # Create fleet environment configuration
     log_info "Creating fleet environment configuration..."
-    cat > "$CONFIG_DIR/fleet.env" <<EOF
+    mkdir -p "$CONFIG_DIR"
+
+    # Use fleet.env.example as template if available, otherwise create inline
+    if [ -f "$SCRIPT_DIR/fleet.env.example" ]; then
+        log_info "Using fleet.env.example as template..."
+        cp "$SCRIPT_DIR/fleet.env.example" "$CONFIG_DIR/fleet.env"
+        # Update paths in the config file
+        sed -i "s|DCM_DIR=.*|DCM_DIR=$DCM_DIR|" "$CONFIG_DIR/fleet.env"
+        sed -i "s|CONFIG_DIR=.*|CONFIG_DIR=$CONFIG_DIR|" "$CONFIG_DIR/fleet.env"
+        sed -i "s|ZENOH_SESSION_CONFIG_URI=.*|ZENOH_SESSION_CONFIG_URI=$DCM_DIR/config/zenoh/session-config.json5|" "$CONFIG_DIR/fleet.env"
+    else
+        cat > "$CONFIG_DIR/fleet.env" <<EOF
 # DCM Fleet Configuration
 # Auto-generated by deployment script on $(date)
 
@@ -483,9 +574,19 @@ ZENOH_SESSION_CONFIG_URI=$DCM_DIR/config/zenoh/session-config.json5
 # App Configuration
 APP_PORT=8090
 EOF
+    fi
 
     chmod 644 "$CONFIG_DIR/fleet.env"
-    log "✓ Fleet environment configuration created"
+    log "✓ Fleet environment configuration created at $CONFIG_DIR/fleet.env"
+
+    # Start services
+    log_info "Starting services..."
+    systemctl start zenoh-router.service || log_warn "Failed to start zenoh-router.service"
+    sleep 2
+    systemctl start rosbridge-websocket.service || log_warn "Failed to start rosbridge-websocket.service"
+    sleep 2
+    systemctl start cmdr-fleet-ui.service || log_warn "Failed to start cmdr-fleet-ui.service"
+    log "✓ Services started"
 
     save_state "$PHASE_KIOSK"
     log "✓ Phase 7 complete"
@@ -681,13 +782,25 @@ main() {
     # Parse arguments
     AUTO_MODE=false
     CONTINUE_MODE=false
+    DCM_REPO=""
+    REPO_URL=""
 
     for arg in "$@"; do
         case $arg in
             --auto) AUTO_MODE=true ;;
             --continue) CONTINUE_MODE=true ;;
+            --dcm=*)
+                DCM_REPO="${arg#*=}"
+                ;;
+            --repo-url=*)
+                REPO_URL="${arg#*=}"
+                ;;
         esac
     done
+
+    # Export repo variables for use in clone phase
+    export DCM_REPO
+    export REPO_URL
 
     # Show banner
     echo ""

@@ -1,0 +1,16 @@
+[Unit]
+Description=DCM Fleet Web Interface
+After=rosbridge-websocket.service
+Wants=rosbridge-websocket.service
+
+[Service]
+Type=simple
+User=developer
+WorkingDirectory=/opt/commander/fleet/dcm-control
+EnvironmentFile=/etc/commander/fleet/fleet.env
+ExecStart=/usr/bin/node app.js
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

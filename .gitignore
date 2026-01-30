@@ -1,0 +1,48 @@
+# DCM Fleet Deployment - Git Ignore
+
+# Environment files (may contain secrets)
+fleet.env
+*.env
+!fleet.env.example
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE/Editor files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Node.js (if any local development)
+node_modules/
+npm-debug.log*
+
+# Build artifacts
+dist/
+build/
+
+# Local configuration overrides
+*.local
+
+# Backup files
+*.bak
+*.backup
+
+# State files (deployment state is tracked separately)
+deployment_state
+
+# RevPi specific
+piCtory_backup/

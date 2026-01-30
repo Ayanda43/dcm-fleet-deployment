@@ -1,6 +1,6 @@
-# DCM Fleet Deployment
+# DCM FLEET Deployment System
 
-Automated deployment system for DCM (Distributed Control Manager) fleet systems on Revolution Pi hardware.
+Automated deployment system for DCM fleet control software on Revolution Pi hardware with ROS2 Kilted.
 
 ## Table of Contents
 
@@ -9,10 +9,15 @@ Automated deployment system for DCM (Distributed Control Manager) fleet systems 
 - [Prerequisites](#prerequisites)
 - [Hardware Preparation](#hardware-preparation)
 - [Deployment Process](#deployment-process)
+- [Deployment Process Walkthrough](#deployment-process-walkthrough)
+- [State Persistence & Reboot Handling](#state-persistence--reboot-handling)
+- [Installed Services](#installed-services)
 - [Post-Deployment](#post-deployment)
+- [Advanced Usage](#advanced-usage)
 - [Troubleshooting](#troubleshooting)
 - [Deployment Checklist](#deployment-checklist)
 - [Version Information](#version-information)
+- [Support](#support)
 
 ## Overview
 
@@ -20,22 +25,20 @@ The DCM Fleet deployment system provides automated installation and configuratio
 
 ### Deployment Methods
 
-1. **Interactive Deployment** - Primary method with prompts for confirmation
-   ```bash
-   sudo ./deploy-dcm-fleet.sh
-   ```
+```bash
+# Interactive Deployment
+sudo ./deploy-dcm-fleet.sh
 
-2. **Automated Deployment** - Non-interactive mode for scripted deployments
-   ```bash
-   sudo ./deploy-dcm-fleet.sh --auto
-   ```
+# Automated Deployment (no prompts)
+sudo ./deploy-dcm-fleet.sh --auto
 
-3. **Custom Repository** - Deploy with alternative DCM repositories
-   ```bash
-   sudo ./deploy-dcm-fleet.sh --dcm=corolla
-   sudo ./deploy-dcm-fleet.sh --repo-url=https://github.com/Ayanda43/corrolla-dcm.git
-   sudo ./deploy-dcm-fleet.sh --repo-url=Ayanda43/tsam-dcm
-   ```
+# Continue from last phase (after reboot or interruption)
+sudo ./deploy-dcm-fleet.sh --continue
+
+# Custom Repository
+sudo ./deploy-dcm-fleet.sh --dcm=corolla
+sudo ./deploy-dcm-fleet.sh --repo-url=https://github.com/Ayanda43/corrolla-dcm.git
+```
 
 ### Target Hardware
 
@@ -47,7 +50,28 @@ The DCM Fleet deployment system provides automated installation and configuratio
 
 ## Deployment Architecture
 
-### Directory Structure
+### Repository Structure
+
+```
+dcm-fleet-deployment/
+├── .gitignore
+├── README.md
+├── deploy-dcm-fleet.sh
+├── revpi_kernel_setup.sh
+├── fleet.env.example              # Example environment config
+├── systemd/
+│   ├── zenoh-router.service       # Zenoh DDS router service
+│   ├── rosbridge-websocket.service # ROS2-WebSocket bridge
+│   └── cmdr-fleet-ui.service      # DCM web interface service
+├── scripts/
+│   ├── install_services.sh        # Service installation helper
+│   ├── setup_github_repo.sh       # GitHub setup helper
+│   └── validate_hardware.sh       # Hardware validation checks
+└── configs/
+    └── revpi/                     # RevPi-specific configs
+```
+
+### Deployed Directory Structure
 
 ```
 /opt/commander/fleet/
@@ -67,15 +91,6 @@ The DCM Fleet deployment system provides automated installation and configuratio
 
 /var/log/fleet-deployment.log       # Deployment logs
 ```
-
-### Systemd Services
-
-| Service | Description | User |
-|---------|-------------|------|
-| `zenoh-router.service` | Zenoh DDS router | root |
-| `rosbridge-websocket.service` | ROS2-WebSocket bridge | developer |
-| `cmdr-fleet-ui.service` | DCM web interface | developer |
-| `lightdm` | Display manager (kiosk) | system |
 
 ## Prerequisites
 
@@ -317,12 +332,340 @@ You can choose which DCM repository to clone at deployment time:
 **During Deployment:**
 - Script may prompt for sudo password
 - Reboot required after RevPi kernel setup (script handles this)
-- Build phase may take 5-10 minutes on ARM64 hardware
 
 **After Deployment:**
 - Review `/etc/commander/fleet/fleet.env` configuration
 - Test services with `sudo systemctl status zenoh-router rosbridge-websocket cmdr-fleet-ui`
 - Verify web UI at `http://localhost:8090`
+
+## Deployment Process Walkthrough
+
+This section provides detailed information about what each phase does, including the exact commands executed.
+
+### Phase 1: RevPi Hardware Setup
+
+**What happens:**
+Sets up Revolution Pi-specific kernel modules and hardware interfaces required for CAN communication and piControl.
+
+```bash
+# Load CAN kernel modules
+sudo modprobe can
+sudo modprobe can_raw
+sudo modprobe can_dev
+
+# Configure CAN interface
+sudo ip link set can0 type can bitrate 1000000
+sudo ip link set up can0
+
+# Run RevPi kernel setup script
+sudo ./revpi_kernel_setup.sh
+
+# Schedule reboot for kernel changes to take effect
+sudo reboot
+```
+
+The script automatically schedules a reboot after this phase and will resume from Phase 2 upon restart.
+
+### Phase 2: Prerequisites & Authentication
+
+**What happens:**
+Creates deployment directories, verifies network connectivity, and installs essential build tools.
+
+```bash
+# Create deployment directories
+sudo mkdir -p /opt/commander/fleet
+sudo mkdir -p /etc/commander/fleet
+sudo mkdir -p /var/lib/commander/fleet
+
+# Update package lists
+sudo apt update
+
+# Install build tools
+sudo apt install -y git curl wget build-essential ca-certificates gnupg
+
+# Install GitHub CLI
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list
+sudo apt update
+sudo apt install -y gh
+```
+
+### Phase 3: ROS2 Kilted Installation
+
+**What happens:**
+Installs the full ROS2 Kilted distribution with Zenoh middleware support.
+
+```bash
+# Add ROS2 GPG key
+sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
+
+# Add ROS2 repository
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | sudo tee /etc/apt/sources.list.d/ros2.list
+
+# Update and install ROS2
+sudo apt update
+sudo apt install -y ros-kilted-ros-base
+
+# Install Zenoh RMW and rosbridge
+sudo apt install -y ros-kilted-rmw-zenoh-cpp
+sudo apt install -y ros-kilted-rosbridge-server
+
+# Initialize rosdep
+sudo rosdep init
+rosdep update
+```
+
+### Phase 4: Clone Repository
+
+**What happens:**
+Clones the DCM application repository to the deployment directory.
+
+```bash
+# Clone DCM repository (default: tsam-dcm)
+cd /opt/commander/fleet
+sudo git clone https://github.com/Ayanda43/tsam-dcm.git dcm-control
+
+# Or with custom repository
+sudo git clone <repo-url> dcm-control
+
+# Set ownership
+sudo chown -R developer:developer /opt/commander/fleet/dcm-control
+```
+
+### Phase 5: Node.js Installation
+
+**What happens:**
+Installs Node.js 20.x LTS from NodeSource repository.
+
+```bash
+# Remove existing Node.js if present
+sudo apt remove -y nodejs npm 2>/dev/null || true
+
+# Add NodeSource repository
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+
+# Install Node.js
+sudo apt install -y nodejs
+
+# Update npm to latest
+sudo npm install -g npm@10
+
+# Verify installation
+node --version  # Should show v20.x.x
+npm --version   # Should show 10.x.x
+```
+
+### Phase 6: Build Application
+
+**What happens:**
+Installs npm dependencies and builds the DCM application.
+
+```bash
+# Navigate to application directory
+cd /opt/commander/fleet/dcm-control
+
+# Install dependencies
+npm install
+
+# Build the application
+npm run build
+```
+
+### Phase 7: Zenoh Router & Services Setup
+
+**What happens:**
+Configures and installs systemd services for the DCM stack.
+
+```bash
+# Run Zenoh setup script from DCM repository
+cd /opt/commander/fleet/dcm-control
+sudo ./scripts/dcm_zenoh_setup.sh
+
+# Install systemd services
+sudo cp /opt/commander/fleet/deployment/systemd/*.service /etc/systemd/system/
+
+# Create environment configuration
+sudo cp /opt/commander/fleet/deployment/fleet.env.example /etc/commander/fleet/fleet.env
+
+# Reload systemd and enable services
+sudo systemctl daemon-reload
+sudo systemctl enable zenoh-router.service
+sudo systemctl enable rosbridge-websocket.service
+sudo systemctl enable cmdr-fleet-ui.service
+
+# Start services
+sudo systemctl start zenoh-router.service
+sudo systemctl start rosbridge-websocket.service
+sudo systemctl start cmdr-fleet-ui.service
+```
+
+### Phase 8: Kiosk Display Setup
+
+**What happens:**
+Configures the display to automatically show the DCM web interface in kiosk mode.
+
+```bash
+# Install display packages
+sudo apt install -y openbox lightdm
+
+# Install Chromium via snap
+sudo snap install chromium
+
+# Configure LightDM auto-login
+sudo tee /etc/lightdm/lightdm.conf << 'EOF'
+[Seat:*]
+autologin-user=developer
+autologin-user-timeout=0
+user-session=openbox
+EOF
+
+# Configure OpenBox autostart for kiosk
+mkdir -p /home/developer/.config/openbox
+tee /home/developer/.config/openbox/autostart << 'EOF'
+# Disable screen blanking
+xset s off
+xset -dpms
+xset s noblank
+
+# Start Chromium in kiosk mode
+chromium --kiosk --noerrdialogs --disable-infobars --no-first-run http://localhost:8090 &
+EOF
+
+# Enable and start display manager
+sudo systemctl enable lightdm
+sudo systemctl start lightdm
+```
+
+## State Persistence & Reboot Handling
+
+The deployment script tracks progress through state persistence, allowing it to resume after reboots or interruptions.
+
+### State File Location
+
+```
+/var/lib/commander/fleet/deployment_state
+```
+
+This file contains the name of the last completed deployment phase.
+
+### How It Works
+
+1. After each phase completes successfully, the script writes the phase name to the state file
+2. If a reboot is required (e.g., after kernel changes), the script schedules the reboot
+3. A systemd service or cron job re-runs the deployment script after boot
+4. The script reads the state file and skips already-completed phases
+
+### Manual Phase Control
+
+```bash
+# Check current deployment phase
+cat /var/lib/commander/fleet/deployment_state
+
+# Continue from current phase
+sudo ./deploy-dcm-fleet.sh --continue
+
+# Restart from beginning (clears state)
+sudo rm /var/lib/commander/fleet/deployment_state
+sudo ./deploy-dcm-fleet.sh
+
+# Skip to a specific phase (advanced)
+echo "phase_4_clone" | sudo tee /var/lib/commander/fleet/deployment_state
+sudo ./deploy-dcm-fleet.sh --continue
+```
+
+### Available Deployment Phases
+
+| Phase | State Value | Description |
+|-------|-------------|-------------|
+| Phase 1 | `phase_1_revpi` | RevPi Hardware Setup |
+| Phase 2 | `phase_2_prereqs` | Prerequisites & Authentication |
+| Phase 3 | `phase_3_ros2` | ROS2 Kilted Installation |
+| Phase 4 | `phase_4_clone` | Clone Repository |
+| Phase 5 | `phase_5_nodejs` | Node.js Installation |
+| Phase 6 | `phase_6_build` | Build Application |
+| Phase 7 | `phase_7_services` | Zenoh Router & Services Setup |
+| Phase 8 | `phase_8_kiosk` | Kiosk Display Setup |
+
+## Installed Services
+
+### Service Dependency Chain
+
+```
+zenoh-router.service (Zenoh DDS Router)
+         ↓ (After/Wants)
+rosbridge-websocket.service (ROS2-WebSocket Bridge)
+         ↓ (After/Wants)
+cmdr-fleet-ui.service (DCM Web Interface)
+```
+
+### Service Details
+
+#### zenoh-router.service
+
+| Property | Value |
+|----------|-------|
+| **Purpose** | Zenoh DDS router for ROS2 fleet communication |
+| **Location** | `/etc/systemd/system/zenoh-router.service` |
+| **Runs as** | root |
+| **Startup** | After network-online.target |
+| **Executable** | `/opt/commander/zenoh/zenohd` |
+
+**Control commands:**
+```bash
+sudo systemctl start zenoh-router.service
+sudo systemctl stop zenoh-router.service
+sudo systemctl restart zenoh-router.service
+sudo journalctl -u zenoh-router.service -f
+```
+
+#### rosbridge-websocket.service
+
+| Property | Value |
+|----------|-------|
+| **Purpose** | ROS2 to WebSocket bridge for web interface |
+| **Location** | `/etc/systemd/system/rosbridge-websocket.service` |
+| **Runs as** | developer |
+| **Startup** | After zenoh-router.service |
+| **Executable** | `ros2 launch rosbridge_server rosbridge_websocket_launch.xml` |
+
+**Control commands:**
+```bash
+sudo systemctl start rosbridge-websocket.service
+sudo systemctl stop rosbridge-websocket.service
+sudo systemctl restart rosbridge-websocket.service
+sudo journalctl -u rosbridge-websocket.service -f
+```
+
+#### cmdr-fleet-ui.service
+
+| Property | Value |
+|----------|-------|
+| **Purpose** | DCM Fleet web interface (Node.js application) |
+| **Location** | `/etc/systemd/system/cmdr-fleet-ui.service` |
+| **Runs as** | developer |
+| **Startup** | After rosbridge-websocket.service |
+| **Working Directory** | `/opt/commander/fleet/dcm-control` |
+| **Executable** | `/usr/bin/node app.js` |
+
+**Control commands:**
+```bash
+sudo systemctl start cmdr-fleet-ui.service
+sudo systemctl stop cmdr-fleet-ui.service
+sudo systemctl restart cmdr-fleet-ui.service
+sudo journalctl -u cmdr-fleet-ui.service -f
+```
+
+### All Services Status
+
+```bash
+# Check status of all DCM services
+sudo systemctl status zenoh-router rosbridge-websocket cmdr-fleet-ui
+
+# Restart all services in correct order
+sudo systemctl restart zenoh-router && \
+sudo systemctl restart rosbridge-websocket && \
+sudo systemctl restart cmdr-fleet-ui
+```
 
 ## Post-Deployment
 
@@ -349,30 +692,46 @@ sudo systemctl restart rosbridge-websocket.service
 sudo systemctl restart cmdr-fleet-ui.service
 ```
 
-### Configuration Updates
+### Configuration
 
-**Environment Configuration:**
-```bash
-sudo nano /etc/commander/fleet/fleet.env
-# Update configuration values as needed
-sudo systemctl restart cmdr-fleet-ui.service
-```
+#### Main Configuration File
 
-**fleet.env contents:**
+**Location:** `/etc/commander/fleet/fleet.env`
+
+**Contents:**
 ```bash
 # ROS2 Configuration
 RMW_IMPLEMENTATION=rmw_zenoh_cpp
 ROS_DISTRO=kilted
+ROS_DOMAIN_ID=0
 
 # DCM Paths
 DCM_DIR=/opt/commander/fleet/dcm-control
 CONFIG_DIR=/etc/commander/fleet
+LOG_DIR=/var/log/commander/fleet
 
 # Zenoh Configuration
 ZENOH_SESSION_CONFIG_URI=/opt/commander/fleet/dcm-control/config/zenoh/session-config.json5
 
-# App Configuration
+# Application Configuration
 APP_PORT=8090
+NODE_ENV=production
+DEBUG=false
+
+# Hardware Configuration
+CAN_INTERFACE=can0
+CAN_BITRATE=1000000
+
+# Kiosk Configuration
+KIOSK_URL=http://localhost:8090
+KIOSK_USER=developer
+```
+
+**To modify configuration:**
+```bash
+sudo nano /etc/commander/fleet/fleet.env
+# Edit values as needed
+sudo systemctl restart cmdr-fleet-ui.service
 ```
 
 ### Validation Checks
@@ -429,6 +788,78 @@ ros2 service list
 ros2 node list
 ```
 
+## Advanced Usage
+
+### Re-run Specific Phases
+
+To re-run a specific deployment phase, manually set the state file to the phase before the one you want to run:
+
+```bash
+# Example: Re-run Phase 6 (Build Application)
+echo "phase_5_nodejs" | sudo tee /var/lib/commander/fleet/deployment_state
+sudo ./deploy-dcm-fleet.sh --continue
+```
+
+### Updating DCM Software
+
+To update the DCM application after deployment:
+
+```bash
+# Navigate to application directory
+cd /opt/commander/fleet/dcm-control
+
+# Pull latest changes
+git pull
+
+# Reinstall dependencies (if package.json changed)
+npm install
+
+# Rebuild application
+npm run build
+
+# Restart services
+sudo systemctl restart cmdr-fleet-ui.service
+```
+
+### Development Mode
+
+To disable auto-start services for development:
+
+```bash
+# Disable services
+sudo systemctl disable zenoh-router.service
+sudo systemctl disable rosbridge-websocket.service
+sudo systemctl disable cmdr-fleet-ui.service
+
+# Stop services
+sudo systemctl stop zenoh-router rosbridge-websocket cmdr-fleet-ui
+
+# Run application manually
+cd /opt/commander/fleet/dcm-control
+source /opt/ros/kilted/setup.bash
+npm run dev
+```
+
+To re-enable production mode:
+
+```bash
+sudo systemctl enable zenoh-router rosbridge-websocket cmdr-fleet-ui
+sudo systemctl start zenoh-router rosbridge-websocket cmdr-fleet-ui
+```
+
+### Disable Kiosk Mode
+
+To disable the kiosk display:
+
+```bash
+# Disable LightDM auto-login
+sudo systemctl disable lightdm
+sudo systemctl stop lightdm
+
+# Or just disable auto-start browser (keep desktop)
+rm /home/developer/.config/openbox/autostart
+```
+
 ## Troubleshooting
 
 ### Common Issues
@@ -456,7 +887,7 @@ sudo mkswap /swapfile
 sudo swapon /swapfile
 
 # Solution 2: Re-run the build phase
-sudo ./deploy-dcm-fleet.sh
+sudo ./deploy-dcm-fleet.sh --continue
 ```
 
 **Issue: CAN interface not found**
@@ -557,7 +988,8 @@ For deployment issues:
 1. Check deployment logs: `sudo tail -f /var/log/fleet-deployment.log`
 2. Check service logs: `sudo journalctl -u <service-name>`
 3. Review deployment state: `cat /var/lib/commander/fleet/deployment_state`
-4. Open an issue at: https://github.com/Ayanda43/dcm-fleet-deployment/issues
+4. Run hardware validation: `./scripts/validate_hardware.sh`
+5. Open an issue at: https://github.com/Ayanda43/dcm-fleet-deployment/issues
 
 ## Deployment Checklist
 
@@ -597,6 +1029,18 @@ For deployment issues:
 | Node.js | 20.x LTS |
 | npm | 10.x |
 | Zenoh RMW | rmw-zenoh-cpp |
+
+## Support
+
+**Maintainer:** Battalion Technologies
+**Repository:** https://github.com/Ayanda43/dcm-fleet-deployment
+**Issues:** https://github.com/Ayanda43/dcm-fleet-deployment/issues
+
+For deployment issues or feature requests, please open an issue on GitHub with:
+- Description of the problem
+- Output of `cat /var/lib/commander/fleet/deployment_state`
+- Relevant logs from `/var/log/fleet-deployment.log`
+- Output of `./scripts/validate_hardware.sh`
 
 ---
 
