@@ -7,7 +7,7 @@ Wants=zenoh-router.service
 Type=simple
 User=developer
 EnvironmentFile=/etc/commander/fleet/fleet.env
-ExecStart=/bin/bash -c 'source /opt/ros/kilted/setup.bash && ros2 launch rosbridge_server rosbridge_websocket_launch.xml'
+ExecStart=/bin/bash -c 'source /opt/ros/kilted/setup.bash && ros2 launch rosbridge_server rosbridge_websocket_launch.xml port:=9091'
 Restart=on-failure
 RestartSec=5
 
