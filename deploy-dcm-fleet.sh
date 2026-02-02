@@ -418,14 +418,14 @@ phase_clone_repo() {
     log "✓ Repository cloned to $DCM_DIR"
 
     # Clone SMACC2 for message definitions
-    SMACC2_DIR="/home/developer/ros2_ws/src/SMACC2"
+    SMACC2_DIR="/home/developer/ros2_ws/src/commander-fleet/SMACC2"
     if [ -d "$SMACC2_DIR" ]; then
         log_info "SMACC2 already exists, pulling latest..."
         sudo -u developer bash -c "cd $SMACC2_DIR && git pull"
     else
         log_info "Cloning SMACC2 repository..."
         sudo -u developer bash -c "
-            cd /home/developer/ros2_ws/src
+            cd /home/developer/ros2_ws/src/commander-fleet
             git clone https://github.com/battalion-technologies/SMACC2.git
         "
     fi
