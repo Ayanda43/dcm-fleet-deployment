@@ -5,7 +5,10 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/opt/commander/zenoh/zenohd
+Environment="LD_LIBRARY_PATH=/opt/ros/kilted/opt/zenoh_cpp_vendor/lib:/opt/ros/kilted/lib"
+Environment="AMENT_PREFIX_PATH=/opt/ros/kilted"
+Environment="PYTHONPATH=/opt/ros/kilted/lib/python3.12/site-packages"
+ExecStart=/opt/ros/kilted/lib/rmw_zenoh_cpp/rmw_zenohd
 Restart=on-failure
 RestartSec=5
 
