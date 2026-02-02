@@ -320,6 +320,11 @@ phase_ros2_install() {
         echo "source /opt/ros/kilted/setup.bash" >> /home/developer/.bashrc
     fi
 
+    # Source local workspace (must come after base ROS2, before RMW config)
+    if ! grep -q "source /home/developer/ros2_ws/install/setup.bash" /home/developer/.bashrc; then
+        echo "source /home/developer/ros2_ws/install/setup.bash" >> /home/developer/.bashrc
+    fi
+
     # Configure RMW for Zenoh middleware
     if ! grep -q "RMW_IMPLEMENTATION" /home/developer/.bashrc; then
         log_info "Adding Zenoh RMW configuration to .bashrc..."
@@ -329,11 +334,6 @@ phase_ros2_install() {
 export RMW_IMPLEMENTATION=rmw_zenoh_cpp
 export ZENOH_SESSION_CONFIG_URI=/home/developer/ros2_ws/src/commander-fleet/dcm-control/config/zenoh/session-config.json5
 EOF
-    fi
-
-    # Source local workspace
-    if ! grep -q "source /home/developer/ros2_ws/install/setup.bash" /home/developer/.bashrc; then
-        echo "source /home/developer/ros2_ws/install/setup.bash" >> /home/developer/.bashrc
     fi
 
     save_state "$PHASE_CLONE"
