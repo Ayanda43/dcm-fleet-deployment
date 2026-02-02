@@ -331,6 +331,11 @@ export ZENOH_SESSION_CONFIG_URI=/home/developer/ros2_ws/src/commander-fleet/dcm-
 EOF
     fi
 
+    # Source local workspace
+    if ! grep -q "source /home/developer/ros2_ws/install/setup.bash" /home/developer/.bashrc; then
+        echo "source /home/developer/ros2_ws/install/setup.bash" >> /home/developer/.bashrc
+    fi
+
     save_state "$PHASE_CLONE"
     log "✓ Phase 3 complete"
 }
@@ -411,6 +416,20 @@ phase_clone_repo() {
     fi
 
     log "✓ Repository cloned to $DCM_DIR"
+
+    # Clone SMACC2 for message definitions
+    SMACC2_DIR="/home/developer/ros2_ws/src/SMACC2"
+    if [ -d "$SMACC2_DIR" ]; then
+        log_info "SMACC2 already exists, pulling latest..."
+        sudo -u developer bash -c "cd $SMACC2_DIR && git pull"
+    else
+        log_info "Cloning SMACC2 repository..."
+        sudo -u developer bash -c "
+            cd /home/developer/ros2_ws/src
+            git clone https://github.com/battalion-technologies/SMACC2.git
+        "
+    fi
+    log "✓ SMACC2 cloned to $SMACC2_DIR"
 
     save_state "$PHASE_NODEJS"
     log "✓ Phase 4 complete"
@@ -509,6 +528,15 @@ phase_build_app() {
     "
 
     log "✓ Application built successfully"
+
+    # Build ROS 2 workspace (SMACC2 messages)
+    log_info "Building ROS 2 workspace..."
+    sudo -u developer bash -c "
+        source /opt/ros/$ROS_DISTRO/setup.bash
+        cd /home/developer/ros2_ws
+        colcon build --packages-select smacc2_msgs
+    "
+    log "✓ ROS 2 workspace built"
 
     save_state "$PHASE_ZENOH"
     log "✓ Phase 6 complete"
