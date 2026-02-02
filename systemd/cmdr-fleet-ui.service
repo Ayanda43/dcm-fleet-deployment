@@ -6,7 +6,7 @@ Wants=rosbridge-websocket.service
 [Service]
 Type=simple
 User=developer
-WorkingDirectory=/opt/commander/fleet/dcm-control
+WorkingDirectory=/home/developer/ros2_ws/src/commander-fleet/dcm-control
 EnvironmentFile=/etc/commander/fleet/fleet.env
 ExecStart=/usr/bin/node app.js
 Restart=on-failure

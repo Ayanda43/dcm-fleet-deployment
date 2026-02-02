@@ -47,7 +47,7 @@ NC='\033[0m' # No Color
 # Configuration
 ROS_DISTRO="kilted"
 FLEET_DIR="/opt/commander/fleet"
-DCM_DIR="/opt/commander/fleet/dcm-control"
+DCM_DIR="/home/developer/ros2_ws/src/commander-fleet/dcm-control"
 DEPLOYMENT_DIR="/opt/commander/fleet/deployment"
 CONFIG_DIR="/etc/commander/fleet"
 STATE_FILE="/var/lib/commander/fleet/deployment_state"
@@ -373,6 +373,10 @@ phase_clone_repo() {
         log_info "Using default TSAM DCM repository"
     fi
 
+    # Create parent directories before clone
+    mkdir -p "$(dirname "$DCM_DIR")"
+    chown -R developer:developer "$(dirname "$DCM_DIR")"
+
     # Clone or update repository
     if [ -d "$DCM_DIR" ]; then
         log_info "Repository already exists, pulling latest..."
@@ -434,9 +438,9 @@ phase_nodejs_install() {
 
     # Install Node.js if needed
     if [ "$NEED_INSTALL" = true ]; then
-        # Remove old apt-installed nodejs and npm
+        # Remove old apt-installed nodejs and npm completely
         log_info "Removing old apt-installed Node.js and npm..."
-        apt remove -y nodejs npm || true
+        apt remove -y nodejs npm 2>/dev/null || true
         apt autoremove -y || true
 
         # Remove old NodeSource repository if it exists
@@ -446,7 +450,8 @@ phase_nodejs_install() {
         log_info "Installing Node.js 20.x LTS from NodeSource..."
         curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
         apt update
-        apt-get install -y --install-recommends nodejs
+        # Force install Node 20 from NodeSource with explicit version
+        apt-get install -y nodejs=20.*-1nodesource1 || apt-get install -y nodejs
 
         # Verify npm is installed
         if ! command -v npm &> /dev/null; then
