@@ -1,0 +1,16 @@
+{
+  // Zenoh session configuration for ROS 2 rmw_zenoh_cpp
+  // This config is used by rosbridge and other ROS 2 nodes to connect to the zenoh router
+  mode: "client",
+  connect: {
+    endpoints: ["tcp/localhost:7447"]
+  },
+  listen: {
+    endpoints: []
+  },
+  scouting: {
+    multicast: {
+      enabled: true
+    }
+  }
+}

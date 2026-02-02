@@ -543,6 +543,15 @@ phase_setup_zenoh() {
         log "✓ Systemd service files installed"
     fi
 
+    # Install zenoh session config for ROS 2 nodes
+    if [ -f "$SCRIPT_DIR/config/zenoh/session-config.json5" ]; then
+        log_info "Installing zenoh session configuration..."
+        mkdir -p "$DCM_DIR/config/zenoh"
+        cp "$SCRIPT_DIR/config/zenoh/session-config.json5" "$DCM_DIR/config/zenoh/"
+        chown -R developer:developer "$DCM_DIR/config"
+        log "✓ Zenoh session config installed"
+    fi
+
     # Enable services
     log_info "Enabling systemd services..."
     systemctl enable zenoh-router.service || true
