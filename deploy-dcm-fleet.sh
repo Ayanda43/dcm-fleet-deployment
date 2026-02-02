@@ -480,12 +480,14 @@ phase_build_app() {
     # Build the Node.js app
     log_info "Installing npm dependencies..."
     sudo -u developer bash -c "
+        source /opt/ros/$ROS_DISTRO/setup.bash
         cd $DCM_DIR
         npm install
     "
 
     log_info "Building application..."
     sudo -u developer bash -c "
+        source /opt/ros/$ROS_DISTRO/setup.bash
         cd $DCM_DIR
         npm run build
     "
