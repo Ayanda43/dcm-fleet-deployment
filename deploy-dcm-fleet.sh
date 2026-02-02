@@ -214,6 +214,35 @@ phase_prerequisites() {
     mkdir -p "$FLEET_DIR"
     mkdir -p "$CONFIG_DIR"
 
+    # Configure RevPi DIO module (if config file exists)
+    SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+    DIO_CONFIG="$SCRIPT_DIR/configs/revpi/dio-default.rsc"
+    PICTORY_CONFIG="/var/www/revpi/pictory/projects/_config.rsc"
+
+    if [ -f "$DIO_CONFIG" ]; then
+        log_info "Configuring RevPi DIO module..."
+
+        # Backup existing config if it exists and has content
+        if [ -f "$PICTORY_CONFIG" ] && [ -s "$PICTORY_CONFIG" ]; then
+            cp "$PICTORY_CONFIG" "$PICTORY_CONFIG.backup"
+            log "✓ Backed up existing RevPi config"
+        fi
+
+        # Copy DIO configuration to Pictory location
+        mkdir -p "$(dirname "$PICTORY_CONFIG")"
+        cp "$DIO_CONFIG" "$PICTORY_CONFIG"
+
+        # Reset piControl to load new configuration
+        if command -v piControlReset &> /dev/null; then
+            piControlReset
+            log "✓ RevPi DIO module configured and loaded"
+        else
+            log_info "piControlReset not available - DIO config will load on next boot"
+        fi
+    else
+        log_info "No DIO config found at $DIO_CONFIG - skipping RevPi module configuration"
+    fi
+
     # Check internet connectivity (with retry for post-boot timing)
     log_info "Checking internet connectivity..."
     RETRY_COUNT=0
