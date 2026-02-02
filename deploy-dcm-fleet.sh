@@ -320,6 +320,17 @@ phase_ros2_install() {
         echo "source /opt/ros/kilted/setup.bash" >> /home/developer/.bashrc
     fi
 
+    # Configure RMW for Zenoh middleware
+    if ! grep -q "RMW_IMPLEMENTATION" /home/developer/.bashrc; then
+        log_info "Adding Zenoh RMW configuration to .bashrc..."
+        cat >> /home/developer/.bashrc << 'EOF'
+
+# ROS 2 Zenoh middleware configuration
+export RMW_IMPLEMENTATION=rmw_zenoh_cpp
+export ZENOH_SESSION_CONFIG_URI=/home/developer/ros2_ws/src/commander-fleet/dcm-control/config/zenoh/session-config.json5
+EOF
+    fi
+
     save_state "$PHASE_CLONE"
     log "✓ Phase 3 complete"
 }
