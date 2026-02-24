@@ -1,7 +1,7 @@
 [Unit]
 Description=DCM Fleet Web Interface
-After=rosbridge-websocket.service
-Wants=rosbridge-websocket.service
+After=dcm-foxglove-bridge.service
+Wants=dcm-foxglove-bridge.service
 
 [Service]
 Type=simple

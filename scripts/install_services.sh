@@ -37,7 +37,7 @@ systemctl daemon-reload
 # Enable services
 echo "Enabling services..."
 systemctl enable zenoh-router.service
-systemctl enable rosbridge-websocket.service
+systemctl enable dcm-foxglove-bridge.service
 systemctl enable cmdr-fleet-ui.service
 
 echo ""
@@ -45,13 +45,13 @@ echo "=== Service Installation Complete ==="
 echo ""
 echo "Services installed:"
 echo "  - zenoh-router.service"
-echo "  - rosbridge-websocket.service"
+echo "  - dcm-foxglove-bridge.service"
 echo "  - cmdr-fleet-ui.service"
 echo ""
 echo "To start services:"
 echo "  sudo systemctl start zenoh-router.service"
-echo "  sudo systemctl start rosbridge-websocket.service"
+echo "  sudo systemctl start dcm-foxglove-bridge.service"
 echo "  sudo systemctl start cmdr-fleet-ui.service"
 echo ""
 echo "Or start all at once:"
-echo "  sudo systemctl start zenoh-router rosbridge-websocket cmdr-fleet-ui"
+echo "  sudo systemctl start zenoh-router dcm-foxglove-bridge cmdr-fleet-ui"

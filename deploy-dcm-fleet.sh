@@ -324,9 +324,9 @@ phase_ros2_install() {
     log_info "Installing Zenoh DDS middleware..."
     apt install -y --allow-downgrades ros-kilted-rmw-zenoh-cpp
 
-    # Install rosbridge for WebSocket communication
-    log_info "Installing rosbridge server..."
-    apt install -y --allow-downgrades ros-kilted-rosbridge-server
+    # Install foxglove bridge for WebSocket communication (replaces rosbridge)
+    log_info "Installing foxglove bridge..."
+    apt install -y --allow-downgrades ros-kilted-foxglove-bridge
 
     # Install development tools
     log_info "Installing ROS2 development tools..."
@@ -623,7 +623,7 @@ phase_setup_zenoh() {
     # Enable services
     log_info "Enabling systemd services..."
     systemctl enable zenoh-router.service || true
-    systemctl enable rosbridge-websocket.service || true
+    systemctl enable dcm-foxglove-bridge.service || true
     systemctl enable cmdr-fleet-ui.service || true
     log "✓ Services enabled"
 
@@ -667,7 +667,7 @@ EOF
     log_info "Starting services..."
     systemctl start zenoh-router.service || log_warn "Failed to start zenoh-router.service"
     sleep 2
-    systemctl start rosbridge-websocket.service || log_warn "Failed to start rosbridge-websocket.service"
+    systemctl start dcm-foxglove-bridge.service || log_warn "Failed to start dcm-foxglove-bridge.service"
     sleep 2
     systemctl start cmdr-fleet-ui.service || log_warn "Failed to start cmdr-fleet-ui.service"
     log "✓ Services started"
@@ -840,11 +840,11 @@ phase_complete() {
     echo ""
     echo -e "  ${CYAN}Systemd Services:${NC}"
     echo -e "    zenoh-router.service:       $(systemctl is-enabled zenoh-router.service 2>/dev/null || echo 'disabled')"
-    echo -e "    rosbridge-websocket.service: $(systemctl is-enabled rosbridge-websocket.service 2>/dev/null || echo 'disabled')"
+    echo -e "    dcm-foxglove-bridge.service: $(systemctl is-enabled dcm-foxglove-bridge.service 2>/dev/null || echo 'disabled')"
     echo -e "    cmdr-fleet-ui.service:      $(systemctl is-enabled cmdr-fleet-ui.service 2>/dev/null || echo 'disabled')"
     echo ""
     echo -e "  ${CYAN}Verification Commands:${NC}"
-    echo -e "    systemctl status zenoh-router rosbridge-websocket cmdr-fleet-ui"
+    echo -e "    systemctl status zenoh-router dcm-foxglove-bridge cmdr-fleet-ui"
     echo -e "    curl http://localhost:8090"
     echo ""
     echo -e "  ${CYAN}Next Steps:${NC}"

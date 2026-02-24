@@ -11,6 +11,9 @@
   scouting: {
     multicast: {
       enabled: true
+    },
+    gossip: {
+      enabled: true
     }
   },
   transport: {
