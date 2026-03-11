@@ -361,7 +361,6 @@ phase_ros2_install() {
 
 # ROS 2 CycloneDDS middleware configuration
 export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-export CYCLONEDDS_URI=file:///home/developer/cyclonedds.xml
 EOF
     fi
 
@@ -625,9 +624,6 @@ ROS_DISTRO=kilted
 # DCM Paths
 DCM_DIR=$DCM_DIR
 CONFIG_DIR=$CONFIG_DIR
-
-# CycloneDDS Configuration
-CYCLONEDDS_URI=file:///home/developer/cyclonedds.xml
 
 # App Configuration
 APP_PORT=8090

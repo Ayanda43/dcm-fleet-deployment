@@ -674,9 +674,6 @@ DCM_DIR=/opt/commander/fleet/dcm-control
 CONFIG_DIR=/etc/commander/fleet
 LOG_DIR=/var/log/commander/fleet
 
-# CycloneDDS Configuration
-CYCLONEDDS_URI=file:///home/developer/cyclonedds.xml
-
 # Application Configuration
 APP_PORT=8090
 NODE_ENV=production
