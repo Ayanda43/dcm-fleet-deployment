@@ -21,7 +21,7 @@ Automated deployment system for DCM fleet control software on Revolution Pi hard
 
 ## Overview
 
-The DCM Fleet deployment system provides automated installation and configuration of the complete DCM software stack onto Revolution Pi Connect 5 hardware. The deployment process installs ROS2 Kilted, Node.js, builds the DCM application, configures Zenoh networking, and sets up a kiosk display for the control interface.
+The DCM Fleet deployment system provides automated installation and configuration of the complete DCM software stack onto Revolution Pi Connect 5 hardware. The deployment process installs ROS2 Kilted, Node.js, builds the DCM application, configures CycloneDDS networking, and sets up a kiosk display for the control interface.
 
 ### Deployment Methods
 
@@ -60,8 +60,7 @@ dcm-fleet-deployment/
 ├── revpi_kernel_setup.sh
 ├── fleet.env.example              # Example environment config
 ├── systemd/
-│   ├── zenoh-router.service       # Zenoh DDS router service
-│   ├── rosbridge-websocket.service # ROS2-WebSocket bridge
+│   ├── dcm-foxglove-bridge.service # ROS2 Foxglove WebSocket bridge
 │   └── cmdr-fleet-ui.service      # DCM web interface service
 ├── scripts/
 │   ├── install_services.sh        # Service installation helper
@@ -79,9 +78,6 @@ dcm-fleet-deployment/
 │   ├── deploy-dcm-fleet.sh         # Main deployment script
 │   └── revpi_kernel_setup.sh       # RevPi hardware setup script
 └── dcm-control/                    # Cloned DCM repository
-    ├── scripts/
-    │   └── dcm_zenoh_setup.sh      # Zenoh router & services setup
-    └── config/zenoh/               # Zenoh configuration files
 
 /etc/commander/fleet/
 └── fleet.env                       # Environment configuration
@@ -120,8 +116,8 @@ dcm-fleet-deployment/
 
 The deployment script automatically installs:
 - ROS2 Kilted distribution (ros-base)
-- ROS2 Zenoh RMW implementation (rmw-zenoh-cpp)
-- ROS2 rosbridge server
+- ROS2 CycloneDDS RMW implementation (rmw-cyclonedds-cpp)
+- ROS2 Foxglove bridge
 - GitHub CLI (`gh`)
 - Node.js 20.x LTS
 - npm 10.x
@@ -252,8 +248,8 @@ Phase 2: Prerequisites & Authentication
 Phase 3: ROS2 Kilted Installation
     ├─> Add ROS2 repository
     ├─> Install ros-kilted-ros-base
-    ├─> Install rmw-zenoh-cpp
-    ├─> Install rosbridge-server
+    ├─> Install rmw-cyclonedds-cpp
+    ├─> Install foxglove-bridge
     └─> Initialize rosdep
 
 Phase 4: Clone Repository
@@ -271,10 +267,8 @@ Phase 6: Build Application
     ├─> Run npm install
     └─> Run npm run build
 
-Phase 7: Zenoh Router & Services Setup
-    ├─> Run dcm_zenoh_setup.sh from cloned repo
-    ├─> Configure zenoh-router.service
-    ├─> Configure rosbridge-websocket.service
+Phase 7: Services Setup
+    ├─> Configure dcm-foxglove-bridge.service
     ├─> Configure cmdr-fleet-ui.service
     └─> Create /etc/commander/fleet/fleet.env
 
@@ -335,7 +329,7 @@ You can choose which DCM repository to clone at deployment time:
 
 **After Deployment:**
 - Review `/etc/commander/fleet/fleet.env` configuration
-- Test services with `sudo systemctl status zenoh-router rosbridge-websocket cmdr-fleet-ui`
+- Test services with `sudo systemctl status dcm-foxglove-bridge cmdr-fleet-ui`
 - Verify web UI at `http://localhost:8090`
 
 ## Deployment Process Walkthrough
@@ -393,7 +387,7 @@ sudo apt install -y gh
 ### Phase 3: ROS2 Kilted Installation
 
 **What happens:**
-Installs the full ROS2 Kilted distribution with Zenoh middleware support.
+Installs the full ROS2 Kilted distribution with CycloneDDS middleware support.
 
 ```bash
 # Add ROS2 GPG key
@@ -406,9 +400,9 @@ echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-a
 sudo apt update
 sudo apt install -y ros-kilted-ros-base
 
-# Install Zenoh RMW and rosbridge
-sudo apt install -y ros-kilted-rmw-zenoh-cpp
-sudo apt install -y ros-kilted-rosbridge-server
+# Install CycloneDDS RMW and foxglove bridge
+sudo apt install -y ros-kilted-rmw-cyclonedds-cpp
+sudo apt install -y ros-kilted-foxglove-bridge
 
 # Initialize rosdep
 sudo rosdep init
@@ -471,16 +465,12 @@ npm install
 npm run build
 ```
 
-### Phase 7: Zenoh Router & Services Setup
+### Phase 7: Services Setup
 
 **What happens:**
 Configures and installs systemd services for the DCM stack.
 
 ```bash
-# Run Zenoh setup script from DCM repository
-cd /opt/commander/fleet/dcm-control
-sudo ./scripts/dcm_zenoh_setup.sh
-
 # Install systemd services
 sudo cp /opt/commander/fleet/deployment/systemd/*.service /etc/systemd/system/
 
@@ -489,13 +479,11 @@ sudo cp /opt/commander/fleet/deployment/fleet.env.example /etc/commander/fleet/f
 
 # Reload systemd and enable services
 sudo systemctl daemon-reload
-sudo systemctl enable zenoh-router.service
-sudo systemctl enable rosbridge-websocket.service
+sudo systemctl enable dcm-foxglove-bridge.service
 sudo systemctl enable cmdr-fleet-ui.service
 
 # Start services
-sudo systemctl start zenoh-router.service
-sudo systemctl start rosbridge-websocket.service
+sudo systemctl start dcm-foxglove-bridge.service
 sudo systemctl start cmdr-fleet-ui.service
 ```
 
@@ -583,7 +571,7 @@ sudo ./deploy-dcm-fleet.sh --continue
 | Phase 4 | `phase_4_clone` | Clone Repository |
 | Phase 5 | `phase_5_nodejs` | Node.js Installation |
 | Phase 6 | `phase_6_build` | Build Application |
-| Phase 7 | `phase_7_services` | Zenoh Router & Services Setup |
+| Phase 7 | `phase_7_services` | Services Setup |
 | Phase 8 | `phase_8_kiosk` | Kiosk Display Setup |
 
 ## Installed Services
@@ -591,49 +579,29 @@ sudo ./deploy-dcm-fleet.sh --continue
 ### Service Dependency Chain
 
 ```
-zenoh-router.service (Zenoh DDS Router)
-         ↓ (After/Wants)
-rosbridge-websocket.service (ROS2-WebSocket Bridge)
+dcm-foxglove-bridge.service (ROS2 Foxglove WebSocket Bridge)
          ↓ (After/Wants)
 cmdr-fleet-ui.service (DCM Web Interface)
 ```
 
 ### Service Details
 
-#### zenoh-router.service
+#### dcm-foxglove-bridge.service
 
 | Property | Value |
 |----------|-------|
-| **Purpose** | Zenoh DDS router for ROS2 fleet communication |
-| **Location** | `/etc/systemd/system/zenoh-router.service` |
-| **Runs as** | root |
-| **Startup** | After network-online.target |
-| **Executable** | `/opt/commander/zenoh/zenohd` |
-
-**Control commands:**
-```bash
-sudo systemctl start zenoh-router.service
-sudo systemctl stop zenoh-router.service
-sudo systemctl restart zenoh-router.service
-sudo journalctl -u zenoh-router.service -f
-```
-
-#### rosbridge-websocket.service
-
-| Property | Value |
-|----------|-------|
-| **Purpose** | ROS2 to WebSocket bridge for web interface |
-| **Location** | `/etc/systemd/system/rosbridge-websocket.service` |
+| **Purpose** | ROS2 Foxglove WebSocket bridge for web interface |
+| **Location** | `/etc/systemd/system/dcm-foxglove-bridge.service` |
 | **Runs as** | developer |
-| **Startup** | After zenoh-router.service |
-| **Executable** | `ros2 launch rosbridge_server rosbridge_websocket_launch.xml` |
+| **Startup** | After network-online.target |
+| **Executable** | `ros2 launch dcm-foxglove-bridge.launch.py` |
 
 **Control commands:**
 ```bash
-sudo systemctl start rosbridge-websocket.service
-sudo systemctl stop rosbridge-websocket.service
-sudo systemctl restart rosbridge-websocket.service
-sudo journalctl -u rosbridge-websocket.service -f
+sudo systemctl start dcm-foxglove-bridge.service
+sudo systemctl stop dcm-foxglove-bridge.service
+sudo systemctl restart dcm-foxglove-bridge.service
+sudo journalctl -u dcm-foxglove-bridge.service -f
 ```
 
 #### cmdr-fleet-ui.service
@@ -643,7 +611,7 @@ sudo journalctl -u rosbridge-websocket.service -f
 | **Purpose** | DCM Fleet web interface (Node.js application) |
 | **Location** | `/etc/systemd/system/cmdr-fleet-ui.service` |
 | **Runs as** | developer |
-| **Startup** | After rosbridge-websocket.service |
+| **Startup** | After dcm-foxglove-bridge.service |
 | **Working Directory** | `/opt/commander/fleet/dcm-control` |
 | **Executable** | `/usr/bin/node app.js` |
 
@@ -659,11 +627,10 @@ sudo journalctl -u cmdr-fleet-ui.service -f
 
 ```bash
 # Check status of all DCM services
-sudo systemctl status zenoh-router rosbridge-websocket cmdr-fleet-ui
+sudo systemctl status dcm-foxglove-bridge cmdr-fleet-ui
 
 # Restart all services in correct order
-sudo systemctl restart zenoh-router && \
-sudo systemctl restart rosbridge-websocket && \
+sudo systemctl restart dcm-foxglove-bridge && \
 sudo systemctl restart cmdr-fleet-ui
 ```
 
@@ -673,22 +640,19 @@ sudo systemctl restart cmdr-fleet-ui
 
 **Check service status:**
 ```bash
-sudo systemctl status zenoh-router.service
-sudo systemctl status rosbridge-websocket.service
+sudo systemctl status dcm-foxglove-bridge.service
 sudo systemctl status cmdr-fleet-ui.service
 ```
 
 **View service logs:**
 ```bash
-sudo journalctl -u zenoh-router.service -f
-sudo journalctl -u rosbridge-websocket.service -f
+sudo journalctl -u dcm-foxglove-bridge.service -f
 sudo journalctl -u cmdr-fleet-ui.service -f
 ```
 
 **Restart services:**
 ```bash
-sudo systemctl restart zenoh-router.service
-sudo systemctl restart rosbridge-websocket.service
+sudo systemctl restart dcm-foxglove-bridge.service
 sudo systemctl restart cmdr-fleet-ui.service
 ```
 
@@ -701,7 +665,7 @@ sudo systemctl restart cmdr-fleet-ui.service
 **Contents:**
 ```bash
 # ROS2 Configuration
-RMW_IMPLEMENTATION=rmw_zenoh_cpp
+RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 ROS_DISTRO=kilted
 ROS_DOMAIN_ID=0
 
@@ -710,8 +674,8 @@ DCM_DIR=/opt/commander/fleet/dcm-control
 CONFIG_DIR=/etc/commander/fleet
 LOG_DIR=/var/log/commander/fleet
 
-# Zenoh Configuration
-ZENOH_SESSION_CONFIG_URI=/opt/commander/fleet/dcm-control/config/zenoh/session-config.json5
+# CycloneDDS Configuration
+CYCLONEDDS_URI=file:///home/developer/cyclonedds.xml
 
 # Application Configuration
 APP_PORT=8090
@@ -756,13 +720,7 @@ curl http://localhost:8090
 # Should return HTML content from the DCM web interface
 ```
 
-**4. Zenoh Router Check:**
-```bash
-sudo systemctl status zenoh-router.service
-# Should show active (running)
-```
-
-**5. Kiosk Display Check:**
+**4. Kiosk Display Check:**
 ```bash
 sudo systemctl status lightdm
 # Should show active (running)
@@ -827,12 +785,11 @@ To disable auto-start services for development:
 
 ```bash
 # Disable services
-sudo systemctl disable zenoh-router.service
-sudo systemctl disable rosbridge-websocket.service
+sudo systemctl disable dcm-foxglove-bridge.service
 sudo systemctl disable cmdr-fleet-ui.service
 
 # Stop services
-sudo systemctl stop zenoh-router rosbridge-websocket cmdr-fleet-ui
+sudo systemctl stop dcm-foxglove-bridge cmdr-fleet-ui
 
 # Run application manually
 cd /opt/commander/fleet/dcm-control
@@ -843,8 +800,8 @@ npm run dev
 To re-enable production mode:
 
 ```bash
-sudo systemctl enable zenoh-router rosbridge-websocket cmdr-fleet-ui
-sudo systemctl start zenoh-router rosbridge-websocket cmdr-fleet-ui
+sudo systemctl enable dcm-foxglove-bridge cmdr-fleet-ui
+sudo systemctl start dcm-foxglove-bridge cmdr-fleet-ui
 ```
 
 ### Disable Kiosk Mode
@@ -908,12 +865,11 @@ ip link show can0
 **Issue: Services fail to start**
 ```bash
 # Check service logs for specific errors
-sudo journalctl -u zenoh-router.service -n 50
+sudo journalctl -u dcm-foxglove-bridge.service -n 50
 sudo journalctl -u cmdr-fleet-ui.service -n 50
 
 # Common causes:
 # - Missing environment file: Check /etc/commander/fleet/fleet.env exists
-# - Dependencies not started: Ensure zenoh-router starts before others
 # - Port conflicts: Check if port 8090 is already in use
 netstat -tlnp | grep 8090
 ```
@@ -974,11 +930,9 @@ sudo systemctl restart cmdr-fleet-ui.service
 **Reset Services:**
 ```bash
 sudo systemctl stop cmdr-fleet-ui.service
-sudo systemctl stop rosbridge-websocket.service
-sudo systemctl stop zenoh-router.service
+sudo systemctl stop dcm-foxglove-bridge.service
 sudo systemctl reset-failed
-sudo systemctl start zenoh-router.service
-sudo systemctl start rosbridge-websocket.service
+sudo systemctl start dcm-foxglove-bridge.service
 sudo systemctl start cmdr-fleet-ui.service
 ```
 
@@ -1008,11 +962,11 @@ For deployment issues:
 - [ ] Phase 4: DCM repository cloned
 - [ ] Phase 5: Node.js 20.x installed
 - [ ] Phase 6: Application built successfully
-- [ ] Phase 7: Zenoh and services configured
+- [ ] Phase 7: Services configured
 - [ ] Phase 8: Kiosk display configured
 
 ### Post-Deployment
-- [ ] Services running: `sudo systemctl status zenoh-router rosbridge-websocket cmdr-fleet-ui`
+- [ ] Services running: `sudo systemctl status dcm-foxglove-bridge cmdr-fleet-ui`
 - [ ] Web UI accessible: `curl http://localhost:8090`
 - [ ] ROS2 environment working: `ros2 node list`
 - [ ] CAN bus operational (if applicable): `ip link show can0`
@@ -1028,7 +982,7 @@ For deployment issues:
 | Target Hardware | Revolution Pi Connect 5 (ARM64) |
 | Node.js | 20.x LTS |
 | npm | 10.x |
-| Zenoh RMW | rmw-zenoh-cpp |
+| CycloneDDS RMW | rmw-cyclonedds-cpp |
 
 ## Support
 
@@ -1044,4 +998,4 @@ For deployment issues or feature requests, please open an issue on GitHub with:
 
 ---
 
-Last Updated: 2025-01-30
+Last Updated: 2026-03-11
