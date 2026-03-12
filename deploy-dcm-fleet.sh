@@ -459,6 +459,20 @@ phase_clone_repo() {
     fi
     log "✓ SMACC2 cloned to $SMACC2_DIR"
 
+    # Clone speed-control package
+    SPEED_CONTROL_DIR="/home/developer/ros2_ws/src/speed-control"
+    if [ -d "$SPEED_CONTROL_DIR" ]; then
+        log_info "speed-control already exists, pulling latest..."
+        sudo -u developer bash -c "cd $SPEED_CONTROL_DIR && git pull"
+    else
+        log_info "Cloning speed-control repository..."
+        sudo -u developer bash -c "
+            cd /home/developer/ros2_ws/src
+            git clone https://github.com/battalion-technologies/speed-control.git
+        "
+    fi
+    log "✓ speed-control cloned to $SPEED_CONTROL_DIR"
+
     save_state "$PHASE_NODEJS"
     log "✓ Phase 4 complete"
 }
@@ -562,7 +576,7 @@ phase_build_app() {
     sudo -u developer bash -c "
         source /opt/ros/$ROS_DISTRO/setup.bash
         cd /home/developer/ros2_ws
-        colcon build --packages-select smacc2_msgs
+        colcon build --packages-select smacc2_msgs speed_control
     "
     log "✓ ROS 2 workspace built"
 
