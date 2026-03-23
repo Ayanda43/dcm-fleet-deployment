@@ -16,8 +16,8 @@
 #   sudo ./deploy-dcm-fleet.sh --repo-url=<url>   # Use custom repository URL
 #
 # Repository Options:
-#   --dcm=tsam     Use Ayanda43/tsam-dcm (default)
-#   --dcm=corolla  Use Ayanda43/corrolla-dcm
+#   --dcm=imv      Use battalion-technologies/imv-dcm (default)
+#   --dcm=corolla  Use battalion-technologies/corolla-dcm
 #   --repo-url=https://github.com/user/repo.git  Clone via git
 #   --repo-url=user/repo                         Clone via gh CLI
 #
@@ -401,21 +401,21 @@ phase_clone_repo() {
         # Predefined DCM repository
         case "$DCM_REPO" in
             corolla)
-                CLONE_REPO="Ayanda43/corrolla-dcm"
+                CLONE_REPO="battalion-technologies/corolla-dcm"
                 CLONE_METHOD="gh"
                 log_info "Using Corolla DCM repository"
                 ;;
-            tsam|*)
-                CLONE_REPO="Ayanda43/tsam-dcm"
+            imv|*)
+                CLONE_REPO="battalion-technologies/imv-dcm"
                 CLONE_METHOD="gh"
-                log_info "Using TSAM DCM repository (default)"
+                log_info "Using IMV DCM repository (default)"
                 ;;
         esac
     else
         # Default repository
-        CLONE_REPO="Ayanda43/tsam-dcm"
+        CLONE_REPO="battalion-technologies/imv-dcm"
         CLONE_METHOD="gh"
-        log_info "Using default TSAM DCM repository"
+        log_info "Using default IMV DCM repository"
     fi
 
     # Create parent directories before clone

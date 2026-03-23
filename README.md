@@ -37,7 +37,7 @@ sudo ./deploy-dcm-fleet.sh --continue
 
 # Custom Repository
 sudo ./deploy-dcm-fleet.sh --dcm=corolla
-sudo ./deploy-dcm-fleet.sh --repo-url=https://github.com/Ayanda43/corrolla-dcm.git
+sudo ./deploy-dcm-fleet.sh --repo-url=https://github.com/battalion-technologies/corolla-dcm.git
 ```
 
 ### Target Hardware
@@ -58,29 +58,36 @@ dcm-fleet-deployment/
 ├── README.md
 ├── deploy-dcm-fleet.sh
 ├── revpi_kernel_setup.sh
-├── fleet.env.example              # Example environment config
+├── fleet.env.example                # Example environment config
+├── config/                          # Reserved for local overrides
 ├── systemd/
-│   ├── dcm-foxglove-bridge.service # ROS2 Foxglove WebSocket bridge
-│   └── cmdr-fleet-ui.service      # DCM web interface service
+│   ├── dcm-foxglove-bridge.service  # ROS2 Foxglove WebSocket bridge
+│   ├── dcm-foxglove-bridge.launch.py # ROS2 launch file for foxglove bridge
+│   └── cmdr-fleet-ui.service       # DCM web interface service
 ├── scripts/
-│   ├── install_services.sh        # Service installation helper
-│   ├── setup_github_repo.sh       # GitHub setup helper
-│   └── validate_hardware.sh       # Hardware validation checks
+│   ├── install_services.sh          # Service installation helper
+│   ├── setup_github_repo.sh         # GitHub setup helper
+│   └── validate_hardware.sh         # Hardware validation checks
 └── configs/
-    └── revpi/                     # RevPi-specific configs
+    └── revpi/                       # RevPi-specific configs
 ```
 
 ### Deployed Directory Structure
 
 ```
 /opt/commander/fleet/
-├── deployment/                     # This repository
-│   ├── deploy-dcm-fleet.sh         # Main deployment script
-│   └── revpi_kernel_setup.sh       # RevPi hardware setup script
-└── dcm-control/                    # Cloned DCM repository
+└── deployment/                     # This repository
+    ├── deploy-dcm-fleet.sh         # Main deployment script
+    └── revpi_kernel_setup.sh       # RevPi hardware setup script
 
-/etc/commander/fleet/
-└── fleet.env                       # Environment configuration
+/home/developer/ros2_ws/src/
+├── commander-fleet/
+│   ├── dcm-control/                # Cloned DCM repository
+│   │   └── config/
+│   │       ├── fleet.env           # Environment config (lives in repo, updates on git pull)
+│   │       └── cyclonedds.xml      # CycloneDDS middleware config
+│   └── SMACC2/                     # SMACC2 message definitions
+└── speed-control/                  # Speed control ROS2 package
 
 /var/lib/commander/fleet/
 └── deployment_state                # State persistence for reboot handling
@@ -254,7 +261,7 @@ Phase 3: ROS2 Kilted Installation
 
 Phase 4: Clone Repository
     ├─> Create /opt/commander/fleet directory
-    ├─> Clone DCM repository (tsam-dcm by default)
+    ├─> Clone DCM repository (imv-dcm by default)
     └─> Or clone custom repo via --dcm/--repo-url flags
 
 Phase 5: Node.js Installation
@@ -288,7 +295,7 @@ sudo apt install gh
 gh auth login
 sudo mkdir -p /opt/commander/fleet
 cd /opt/commander/fleet
-sudo git clone https://github.com/Ayanda43/dcm-fleet-deployment.git /opt/commander/fleet/deployment
+sudo git clone https://github.com/battalion-technologies/dcm-fleet-deployment.git /opt/commander/fleet/deployment
 cd deployment
 ```
 
@@ -305,8 +312,8 @@ You can choose which DCM repository to clone at deployment time:
 
 | Option | Repository | Command |
 |--------|------------|---------|
-| Default | Ayanda43/tsam-dcm | `sudo ./deploy-dcm-fleet.sh` |
-| Corolla | Ayanda43/corrolla-dcm | `sudo ./deploy-dcm-fleet.sh --dcm=corolla` |
+| Default (IMV) | battalion-technologies/imv-dcm | `sudo ./deploy-dcm-fleet.sh` |
+| Corolla | battalion-technologies/corolla-dcm | `sudo ./deploy-dcm-fleet.sh --dcm=corolla` |
 | Custom URL | Any git URL | `sudo ./deploy-dcm-fleet.sh --repo-url=<url>` |
 | Custom GitHub | owner/repo | `sudo ./deploy-dcm-fleet.sh --repo-url=owner/repo` |
 
@@ -328,7 +335,7 @@ You can choose which DCM repository to clone at deployment time:
 - Reboot required after RevPi kernel setup (script handles this)
 
 **After Deployment:**
-- Review `/etc/commander/fleet/fleet.env` configuration
+- Review `dcm-control/config/fleet.env` configuration
 - Test services with `sudo systemctl status dcm-foxglove-bridge cmdr-fleet-ui`
 - Verify web UI at `http://localhost:8090`
 
@@ -404,9 +411,18 @@ sudo apt install -y ros-kilted-ros-base
 sudo apt install -y ros-kilted-rmw-cyclonedds-cpp
 sudo apt install -y ros-kilted-foxglove-bridge
 
+# Install development tools
+sudo apt install -y python3-colcon-common-extensions python3-rosdep ros-dev-tools
+
 # Initialize rosdep
 sudo rosdep init
 rosdep update
+
+# Configure ROS2 + CycloneDDS in .bashrc
+echo "source /opt/ros/kilted/setup.bash" >> ~/.bashrc
+echo "source /home/developer/ros2_ws/install/setup.bash" >> ~/.bashrc
+echo "export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp" >> ~/.bashrc
+echo "export CYCLONEDDS_URI=file:///home/developer/ros2_ws/src/commander-fleet/dcm-control/config/cyclonedds.xml" >> ~/.bashrc
 ```
 
 ### Phase 4: Clone Repository
@@ -415,15 +431,20 @@ rosdep update
 Clones the DCM application repository to the deployment directory.
 
 ```bash
-# Clone DCM repository (default: tsam-dcm)
-cd /opt/commander/fleet
-sudo git clone https://github.com/Ayanda43/tsam-dcm.git dcm-control
+# Clone DCM repository (default: imv-dcm)
+cd /home/developer/ros2_ws/src/commander-fleet
+gh repo clone battalion-technologies/imv-dcm dcm-control
 
 # Or with custom repository
-sudo git clone <repo-url> dcm-control
+git clone <repo-url> dcm-control
 
-# Set ownership
-sudo chown -R developer:developer /opt/commander/fleet/dcm-control
+# Clone SMACC2 for message definitions
+cd /home/developer/ros2_ws/src/commander-fleet
+git clone https://github.com/battalion-technologies/SMACC2.git
+
+# Clone speed-control ROS2 package
+cd /home/developer/ros2_ws/src
+git clone https://github.com/battalion-technologies/speed-control.git
 ```
 
 ### Phase 5: Node.js Installation
@@ -452,30 +473,36 @@ npm --version   # Should show 10.x.x
 ### Phase 6: Build Application
 
 **What happens:**
-Installs npm dependencies and builds the DCM application.
+Installs npm dependencies, builds the DCM React application, and builds the ROS2 workspace for SMACC2 messages and speed control.
 
 ```bash
 # Navigate to application directory
-cd /opt/commander/fleet/dcm-control
+cd /home/developer/ros2_ws/src/commander-fleet/dcm-control
 
 # Install dependencies
+source /opt/ros/kilted/setup.bash
 npm install
 
-# Build the application
+# Build the React application
 npm run build
+
+# Build ROS2 workspace (SMACC2 messages + speed control)
+cd /home/developer/ros2_ws
+colcon build --packages-select smacc2_msgs speed_control
 ```
 
 ### Phase 7: Services Setup
 
 **What happens:**
-Configures and installs systemd services for the DCM stack.
+Verifies the repo-bundled `fleet.env` exists, generates systemd service files inline (referencing `config/fleet.env` from the DCM repo), and enables/starts services.
 
 ```bash
-# Install systemd services
-sudo cp /opt/commander/fleet/deployment/systemd/*.service /etc/systemd/system/
+# Verify fleet.env exists in the DCM repo (updates automatically on git pull)
+ls /home/developer/ros2_ws/src/commander-fleet/dcm-control/config/fleet.env
 
-# Create environment configuration
-sudo cp /opt/commander/fleet/deployment/fleet.env.example /etc/commander/fleet/fleet.env
+# Script generates service files inline to /etc/systemd/system/
+# Services reference EnvironmentFile from the repo config:
+#   EnvironmentFile=/home/developer/ros2_ws/src/commander-fleet/dcm-control/config/fleet.env
 
 # Reload systemd and enable services
 sudo systemctl daemon-reload
@@ -516,7 +543,7 @@ xset -dpms
 xset s noblank
 
 # Start Chromium in kiosk mode
-chromium --kiosk --noerrdialogs --disable-infobars --no-first-run http://localhost:8090 &
+chromium --disable-infobars --kiosk --ozone-platform=x11 --use-gl=desktop --disable-gpu-compositing 'http://localhost:8090'
 EOF
 
 # Enable and start display manager
@@ -557,7 +584,7 @@ sudo rm /var/lib/commander/fleet/deployment_state
 sudo ./deploy-dcm-fleet.sh
 
 # Skip to a specific phase (advanced)
-echo "phase_4_clone" | sudo tee /var/lib/commander/fleet/deployment_state
+echo "clone_repo" | sudo tee /var/lib/commander/fleet/deployment_state
 sudo ./deploy-dcm-fleet.sh --continue
 ```
 
@@ -565,14 +592,15 @@ sudo ./deploy-dcm-fleet.sh --continue
 
 | Phase | State Value | Description |
 |-------|-------------|-------------|
-| Phase 1 | `phase_1_revpi` | RevPi Hardware Setup |
-| Phase 2 | `phase_2_prereqs` | Prerequisites & Authentication |
-| Phase 3 | `phase_3_ros2` | ROS2 Kilted Installation |
-| Phase 4 | `phase_4_clone` | Clone Repository |
-| Phase 5 | `phase_5_nodejs` | Node.js Installation |
-| Phase 6 | `phase_6_build` | Build Application |
-| Phase 7 | `phase_7_services` | Services Setup |
-| Phase 8 | `phase_8_kiosk` | Kiosk Display Setup |
+| Phase 1 | `revpi_setup` | RevPi Hardware Setup |
+| Phase 2 | `prerequisites` | Prerequisites & Authentication |
+| Phase 3 | `ros2_install` | ROS2 Kilted Installation |
+| Phase 4 | `clone_repo` | Clone Repository |
+| Phase 5 | `nodejs_install` | Node.js Installation |
+| Phase 6 | `build_app` | Build Application |
+| Phase 7 | `setup_services` | Services Setup |
+| Phase 8 | `setup_kiosk` | Kiosk Display Setup |
+| Done | `complete` | Deployment Complete |
 
 ## Installed Services
 
@@ -612,7 +640,7 @@ sudo journalctl -u dcm-foxglove-bridge.service -f
 | **Location** | `/etc/systemd/system/cmdr-fleet-ui.service` |
 | **Runs as** | developer |
 | **Startup** | After dcm-foxglove-bridge.service |
-| **Working Directory** | `/opt/commander/fleet/dcm-control` |
+| **Working Directory** | `/home/developer/ros2_ws/src/commander-fleet/dcm-control` |
 | **Executable** | `/usr/bin/node app.js` |
 
 **Control commands:**
@@ -660,7 +688,9 @@ sudo systemctl restart cmdr-fleet-ui.service
 
 #### Main Configuration File
 
-**Location:** `/etc/commander/fleet/fleet.env`
+**Location:** `/home/developer/ros2_ws/src/commander-fleet/dcm-control/config/fleet.env`
+
+This file lives in the DCM repo so it updates automatically on `git pull`. Services reference it directly via `EnvironmentFile`.
 
 **Contents:**
 ```bash
@@ -668,9 +698,10 @@ sudo systemctl restart cmdr-fleet-ui.service
 RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 ROS_DISTRO=kilted
 ROS_DOMAIN_ID=0
+CYCLONEDDS_URI=file:///home/developer/ros2_ws/src/commander-fleet/dcm-control/config/cyclonedds.xml
 
 # DCM Paths
-DCM_DIR=/opt/commander/fleet/dcm-control
+DCM_DIR=/home/developer/dcm-control
 CONFIG_DIR=/etc/commander/fleet
 LOG_DIR=/var/log/commander/fleet
 
@@ -690,7 +721,7 @@ KIOSK_USER=developer
 
 **To modify configuration:**
 ```bash
-sudo nano /etc/commander/fleet/fleet.env
+nano /home/developer/ros2_ws/src/commander-fleet/dcm-control/config/fleet.env
 # Edit values as needed
 sudo systemctl restart cmdr-fleet-ui.service
 ```
@@ -751,7 +782,7 @@ To re-run a specific deployment phase, manually set the state file to the phase 
 
 ```bash
 # Example: Re-run Phase 6 (Build Application)
-echo "phase_5_nodejs" | sudo tee /var/lib/commander/fleet/deployment_state
+echo "nodejs_install" | sudo tee /var/lib/commander/fleet/deployment_state
 sudo ./deploy-dcm-fleet.sh --continue
 ```
 
@@ -761,9 +792,9 @@ To update the DCM application after deployment:
 
 ```bash
 # Navigate to application directory
-cd /opt/commander/fleet/dcm-control
+cd /home/developer/ros2_ws/src/commander-fleet/dcm-control
 
-# Pull latest changes
+# Pull latest changes (also updates config/fleet.env)
 git pull
 
 # Reinstall dependencies (if package.json changed)
@@ -789,7 +820,7 @@ sudo systemctl disable cmdr-fleet-ui.service
 sudo systemctl stop dcm-foxglove-bridge cmdr-fleet-ui
 
 # Run application manually
-cd /opt/commander/fleet/dcm-control
+cd /home/developer/ros2_ws/src/commander-fleet/dcm-control
 source /opt/ros/kilted/setup.bash
 npm run dev
 ```
@@ -866,7 +897,7 @@ sudo journalctl -u dcm-foxglove-bridge.service -n 50
 sudo journalctl -u cmdr-fleet-ui.service -n 50
 
 # Common causes:
-# - Missing environment file: Check /etc/commander/fleet/fleet.env exists
+# - Missing environment file: Check dcm-control/config/fleet.env exists
 # - Port conflicts: Check if port 8090 is already in use
 netstat -tlnp | grep 8090
 ```
@@ -917,8 +948,8 @@ sudo ./deploy-dcm-fleet.sh
 
 **Rebuild Application:**
 ```bash
-cd /opt/commander/fleet/dcm-control
-rm -rf node_modules dist build
+cd /home/developer/ros2_ws/src/commander-fleet/dcm-control
+rm -rf node_modules build
 npm install
 npm run build
 sudo systemctl restart cmdr-fleet-ui.service
@@ -940,7 +971,7 @@ For deployment issues:
 2. Check service logs: `sudo journalctl -u <service-name>`
 3. Review deployment state: `cat /var/lib/commander/fleet/deployment_state`
 4. Run hardware validation: `./scripts/validate_hardware.sh`
-5. Open an issue at: https://github.com/Ayanda43/dcm-fleet-deployment/issues
+5. Open an issue at: https://github.com/battalion-technologies/dcm-fleet-deployment/issues
 
 ## Deployment Checklist
 
@@ -984,8 +1015,8 @@ For deployment issues:
 ## Support
 
 **Maintainer:** Battalion Technologies
-**Repository:** https://github.com/Ayanda43/dcm-fleet-deployment
-**Issues:** https://github.com/Ayanda43/dcm-fleet-deployment/issues
+**Repository:** https://github.com/battalion-technologies/dcm-fleet-deployment
+**Issues:** https://github.com/battalion-technologies/dcm-fleet-deployment/issues
 
 For deployment issues or feature requests, please open an issue on GitHub with:
 - Description of the problem
@@ -995,4 +1026,4 @@ For deployment issues or feature requests, please open an issue on GitHub with:
 
 ---
 
-Last Updated: 2026-03-11
+Last Updated: 2026-03-23
